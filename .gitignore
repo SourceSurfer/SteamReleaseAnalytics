@@ -1,0 +1,100 @@
+# Visual Studio
+.vs/
+.vscode/
+*.sln.user
+*.user
+*.userprefs
+*.rsuser
+*.suo
+*.sln.docstates
+
+# Build results
+bin/
+obj/
+Debug/
+Release/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+out/
+[Ll]og/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+.nuget/packages/
+nuget.config
+
+# Entity Framework
+*.edmx.diagram
+*.edmx
+Migrations/
+
+# Test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# Visual Studio cache/options
+.vs/
+
+# Local History for Visual Studio
+.localhistory/
+
+# BeatPulse healthcheck temp database
+healthchecksdb
+
+# IDEs
+.idea/
+.idea_modules/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+.directory
+ehthumbs.db
+
+# Docker overrides
+docker-compose.override.yml
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+appsettings.Development.json
+appsettings.Production.json
+
+# Rider
+.idea/
+.idea_modules/
+*.sln.iml
+riderModule.iml
+
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Backup files
+*.bak
+*.tmp
+*~
+
+# Application Insights
+ApplicationInsights.config
+
+# Logs
+logs/
+*.log
