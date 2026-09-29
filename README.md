@@ -1,5 +1,7 @@
 # Steam Release Analytics API
 
+[![CI](https://github.com/SourceSurfer/SteamReleaseAnalytics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SourceSurfer/SteamReleaseAnalytics/actions/workflows/ci.yml?query=branch%3Amain) [![Tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FSourceSurfer%2FSteamReleaseAnalytics%2Fbadges%2Ftests.json)](https://github.com/SourceSurfer/SteamReleaseAnalytics/actions/workflows/ci.yml?query=branch%3Amain)
+
 Backend-сервис для сбора, агрегации и анализа данных о релизах игр на Steam. Приложение предоставляет REST API для получения информации о будущих релизах, статистики по жанрам и анализа динамики изменений.
 
 ## 🎯 Основные возможности
@@ -62,6 +64,8 @@ SteamReleaseAnalytics/
 │   └── Security/
 │       ├── IJwtTokenGenerator.cs
 │       └── JwtTokenGenerator.cs
+├── tests/SteamReleaseAnalytics.Tests/   # Юнит-тесты (xUnit, NSubstitute, FluentAssertions)
+├── .github/workflows/ci.yml             # CI: сборка, тесты, значок числа тестов
 ├── docker-compose.yml                   # Docker Compose конфигурация
 ├── Dockerfile                           # Docker образ для API
 └── README.md                            # Документация
@@ -214,6 +218,14 @@ Authorization: Bearer <ваш_токен>
 - FollowersCount
 - SnapshotDate
 ```
+
+## ✅ Как запустить тесты
+
+```bash
+dotnet test
+```
+
+Тесты не требуют ни PostgreSQL, ни сети: репозитории подменяются через NSubstitute, а сами репозитории проверяются на EF Core InMemory. Покрыты расчёт статистики жанров (`AnalyticsService`), выдача и проверка JWT (`JwtTokenGenerator`), выборка релизов по месяцу и тегу, календарь релизов и валидация запросов в контроллерах.
 
 ## 🧪 Тестирование API
 

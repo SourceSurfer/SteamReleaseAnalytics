@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    outputs:
+      total: ${{ steps.results.outputs.total }}
+      passed: ${{ steps.results.outputs.passed }}
+      failed: ${{ steps.results.outputs.failed }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore SteamReleaseAnalytics.sln
+
+      - name: Build
+        run: dotnet build SteamReleaseAnalytics.sln --configuration Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test SteamReleaseAnalytics.sln
+          --configuration Release --no-build
+          --logger "trx"
+          --results-directory TestResults
+
+      - name: Test results → job summary
+        id: results
+        if: always()
+        shell: python
+        run: |
+          import glob, os, xml.etree.ElementTree as ET
+
+          ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          total = executed = passed = failed = skipped = 0
+          failures = []
+
+          for path in glob.glob("TestResults/**/*.trx", recursive=True):
+              root = ET.parse(path).getroot()
+              c = root.find("t:ResultSummary/t:Counters", ns)
+              total += int(c.get("total", 0))
+              executed += int(c.get("executed", 0))
+              passed += int(c.get("passed", 0))
+              failed += int(c.get("failed", 0))
+              skipped += int(c.get("notExecuted", 0))
+              for r in root.iterfind("t:Results/t:UnitTestResult", ns):
+                  if r.get("outcome") == "Failed":
+                      failures.append(r.get("testName"))
+
+          lines = [
+              "## Test results",
+              "",
+              "| Total | Passed | Failed | Skipped |",
+              "|------:|-------:|-------:|--------:|",
+              f"| {total} | {passed} | {failed} | {skipped} |",
+          ]
+          if failures:
+              lines += ["", "### Failed tests", ""] + [f"- `{name}`" for name in failures]
+          if executed == 0:
+              lines += ["", "> **Error:** 0 tests were executed. The test project is missing or no tests were discovered."]
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(lines) + "\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"total={executed}\npassed={passed}\nfailed={failed}\n")
+
+          if executed == 0:
+              print("::error::0 tests were executed - failing the job.")
+              raise SystemExit(1)
+
+  tests-badge:
+    name: Update tests badge
+    needs: build-and-test
+    # Значок обновляется только из main и отражает и зелёный, и красный прогон.
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build-and-test.outputs.total != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: tests-badge
+      cancel-in-progress: false
+
+    steps:
+      - name: Publish shields.io endpoint JSON to the badges branch
+        env:
+          TOTAL: ${{ needs.build-and-test.outputs.total }}
+          PASSED: ${{ needs.build-and-test.outputs.passed }}
+          FAILED: ${{ needs.build-and-test.outputs.failed }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$TOTAL" = "0" ]; then
+            message="no tests"; color="red"
+          elif [ "$FAILED" != "0" ]; then
+            message="$PASSED passed, $FAILED failed"; color="red"
+          else
+            message="$PASSED passed"; color="brightgreen"
+          fi
+
+          mkdir badges && cd badges
+          git init --quiet --initial-branch=badges
+          printf '{"schemaVersion":1,"label":"tests","message":"%s","color":"%s","cacheSeconds":300}\n' \
+            "$message" "$color" > tests.json
+          cat tests.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests.json
+          git commit --quiet -m "tests badge: $message (${GITHUB_SHA::7})"
+          git push --force --quiet \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:badges
