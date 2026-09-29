@@ -21,7 +21,7 @@ Backend-сервис на ASP.NET Core для хранения и анализа
 - **Аутентификация**: JWT токены
 - **Контейнеризация**: Docker и Docker Compose
 - **API документация**: Swagger / OpenAPI (Swashbuckle)
-- **Тесты**: xUnit, NSubstitute, FluentAssertions, EF Core InMemory
+- **Тесты**: xUnit, NSubstitute, FluentAssertions, EF Core InMemory, WebApplicationFactory
 - **Архитектура**: монолит с разделением на проекты Api / Services / Infrastructure / Core
 
 ## 📋 Структура проекта
@@ -32,7 +32,10 @@ SteamReleaseAnalytics/
 │   ├── Controllers/
 │   │   ├── GamesController.cs           # Эндпоинты для работы с играми
 │   │   ├── AnalyticsController.cs       # Эндпоинты аналитики
-│   │   └── AuthController.cs            # Аутентификация
+│   │   └── AuthController.cs            # Вход демо-пользователя, выдача JWT
+│   ├── Auth/                            # Демо-учётка (DemoUserOptions) и роли
+│   ├── Swagger/                         # Схема Bearer для защищённых операций
+│   ├── Validation/                      # Допустимый период запросов (год, формат месяца)
 │   ├── Program.cs                       # Конфигурация приложения
 │   ├── SteamReleaseAnalytics.Api.http   # Готовые запросы к API (VS / Rider / VS Code REST Client)
 │   └── appsettings.json                 # Настройки
@@ -51,7 +54,7 @@ SteamReleaseAnalytics/
 ├── SteamReleaseAnalytics.Infrastructure/# Работа с БД и репозитории
 │   ├── Data/
 │   │   └── SteamDbContext.cs            # Entity Framework контекст
-│   ├── Migrations/                      # Миграции БД (EF Core)
+│   ├── Migrations/                      # Миграции БД (EF Core): InitialCreate, MakeOptionalGameFieldsNullable
 │   └── Repositories/                    # Репозитории
 │       ├── IGameRepository.cs
 │       ├── GameRepository.cs
@@ -65,12 +68,17 @@ SteamReleaseAnalytics/
 │   │   └── AnalyticsService.cs
 │   └── Security/
 │       ├── IJwtTokenGenerator.cs
+│       ├── JwtOptions.cs                # Настройки JWT, проверяются при старте
 │       └── JwtTokenGenerator.cs
-├── tests/SteamReleaseAnalytics.Tests/   # Юнит-тесты (xUnit, NSubstitute, FluentAssertions)
+├── tests/SteamReleaseAnalytics.Tests/   # Тесты (xUnit, NSubstitute, FluentAssertions)
+│   ├── Api/                             # Контроллеры, валидация DTO, интеграционные тесты конвейера
+│   ├── Services/                        # AnalyticsService, JwtTokenGenerator
+│   └── Infrastructure/                  # Репозитории и модель EF на InMemory
 ├── .github/workflows/ci.yml             # CI: сборка, тесты, значок числа тестов
 ├── dotnet-tools.json                    # Локальный инструмент dotnet-ef
 ├── docker-compose.yml                   # Docker Compose конфигурация
 ├── Dockerfile                           # Docker образ для API
+├── LICENSE                              # Лицензия MIT
 └── README.md                            # Документация
 ```
 
@@ -132,9 +140,9 @@ dotnet ef database update --project SteamReleaseAnalytics.Infrastructure --start
 ### Аутентификация
 
 **POST** `/api/v1/auth/login`
-- Получить JWT токен для аутентификации
+- Получить JWT токен демо-пользователя (роль Admin)
 - Body: `{"username": "admin", "password": "admin"}`
-- Response: `{"token": "eyJhbGc..."}`
+- Response: `{"token": "eyJhbGc..."}`; неверные логин или пароль — 401, пустые — 400
 
 ### Игры
 
@@ -146,17 +154,17 @@ dotnet ef database update --project SteamReleaseAnalytics.Infrastructure --start
 - Получить игру по ID
 - Response: GameDto
 
-**POST** `/api/v1/games` (требует авторизацию)
+**POST** `/api/v1/games` (роль Admin)
 - Создать новую игру
-- Body: CreateGameDto
-- Response: GameDto (код 201)
+- Body: CreateGameDto — обязательны только `steamAppId` и `title`
+- Response: GameDto (код 201); игра с таким ID уже есть или тело не прошло валидацию — 400
 
-**DELETE** `/api/v1/games/{id}` (требует авторизацию)
+**DELETE** `/api/v1/games/{id}` (роль Admin)
 - Удалить игру
-- Response: код 204
+- Response: код 204; неизвестный ID — 404
 
 **GET** `/api/v1/games/calendar?month=2025-11`
-- Получить календарь релизов на месяц
+- Получить календарь релизов на месяц (строго `YYYY-MM`, год 1970–2100)
 - Response: GameCalendarDto
 
 **GET** `/api/v1/games/by-tag/{tagName}`
@@ -166,12 +174,29 @@ dotnet ef database update --project SteamReleaseAnalytics.Infrastructure --start
 ### Аналитика
 
 **GET** `/api/v1/analytics/top-genres?month=11&year=2025`
-- Получить топ-5 жанров за месяц
+- Получить топ-5 жанров за месяц (месяц 1–12, год 1970–2100)
 - Response: массив GenreStatsDto
 
 **GET** `/api/v1/analytics/genre-dynamics`
-- Получить динамику изменений топ-5 жанров за последние 3 месяца
+- Получить динамику топ-5 жанров за последние 3 месяца (текущий и два предыдущих); топ-5 выбирается по числу игр за все три месяца
 - Response: массив GenreDynamicsDto
+
+### Валидация и ошибки
+
+`CreateGameDto` проверяется до вызова контроллера:
+
+| Поле | Правило |
+|---|---|
+| `steamAppId` | ≥ 1 |
+| `title` | обязательно, до 500 символов |
+| `description` | до 2000 символов |
+| `imageUrl`, `storeUrl` | URL (http, https или ftp), до 500 символов |
+| `followers` | ≥ 0 |
+| `platforms` | до 200 символов |
+| `tags` | до 20 тегов, каждый непустой и до 100 символов; дубликаты схлопываются |
+| `releaseDate` | дата без часового пояса считается UTC |
+
+Ошибки валидации тела запроса, 401/403/404 без тела и непредвиденные ошибки возвращаются в формате [ProblemDetails](https://www.rfc-editor.org/rfc/rfc9457) (`application/problem+json`): 400 — с перечнем полей, 500 — без деталей исключения и stack trace. Проверки параметров в контроллерах (месяц, год, повторный `steamAppId`) отвечают 400 с текстом ошибки.
 
 ## 🔐 Аутентификация
 
@@ -244,7 +269,8 @@ dotnet test
 ### Через Swagger UI
 
 1. Откройте http://localhost:8080/swagger/index.html
-2. Используйте интерактивный интерфейс для тестирования эндпоинтов
+2. Выполните `POST /api/v1/auth/login` с `{"username": "admin", "password": "admin"}` и скопируйте `token`
+3. Нажмите **Authorize** и вставьте токен — после этого доступны POST и DELETE (они помечены замком)
 
 ### Через .http файл
 
