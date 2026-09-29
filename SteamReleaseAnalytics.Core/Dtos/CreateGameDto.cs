@@ -12,31 +12,35 @@ namespace SteamReleaseAnalytics.Core.Dtos
 
         [Required]
         [MaxLength(500)]
-        public string Title { get; set; }
+        public string Title { get; set; } = string.Empty;
 
         [MaxLength(2000)]
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
         public DateTime? ReleaseDate { get; set; }
 
         [MaxLength(500)]
         [Url]
-        public string ImageUrl { get; set; }
+        public string? ImageUrl { get; set; }
 
         [MaxLength(500)]
         [Url]
-        public string StoreUrl { get; set; }
+        public string? StoreUrl { get; set; }
 
         [Range(0, int.MaxValue)]
         public int Followers { get; set; }
 
         [MaxLength(200)]
-        public string Platforms { get; set; }
+        public string? Platforms { get; set; }
 
         public List<string> Tags { get; set; } = new();
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            // "tags": null в JSON уже отклонён как обязательное поле
+            if (Tags is null)
+                yield break;
+
             if (Tags.Count > MaxTags)
                 yield return new ValidationResult($"Не больше {MaxTags} тегов", new[] { nameof(Tags) });
 

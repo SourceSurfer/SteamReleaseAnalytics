@@ -4,7 +4,7 @@ namespace SteamReleaseAnalytics.Infrastructure.Repositories
 {
     public interface IGameRepository
     {
-        Task<Game> GetGameByIdAsync(int steamAppId);
+        Task<Game?> GetGameByIdAsync(int steamAppId);
         Task<List<Game>> GetAllGamesAsync();
         Task<List<Game>> GetGamesByMonthAsync(int year, int month);
         Task<List<Game>> GetGamesByTagAsync(string tagName);

@@ -77,6 +77,28 @@ namespace SteamReleaseAnalytics.Tests.Infrastructure
             snapshots.Select(s => s.FollowersCount).Should().Equal(5);
         }
 
+        [Theory]
+        [InlineData(nameof(Core.Models.Game.Description))]
+        [InlineData(nameof(Core.Models.Game.ImageUrl))]
+        [InlineData(nameof(Core.Models.Game.StoreUrl))]
+        [InlineData(nameof(Core.Models.Game.Platforms))]
+        public void GameModel_OptionalColumnsAreNullable(string property)
+        {
+            using var context = NewContext();
+
+            context.Model.FindEntityType(typeof(Core.Models.Game))!.FindProperty(property)!
+                .IsNullable.Should().BeTrue();
+        }
+
+        [Fact]
+        public void GameModel_TitleIsRequired()
+        {
+            using var context = NewContext();
+
+            context.Model.FindEntityType(typeof(Core.Models.Game))!.FindProperty(nameof(Core.Models.Game.Title))!
+                .IsNullable.Should().BeFalse();
+        }
+
         [Fact]
         public async Task GetGamesByMonth_LoadsTagsOfReturnedGames()
         {

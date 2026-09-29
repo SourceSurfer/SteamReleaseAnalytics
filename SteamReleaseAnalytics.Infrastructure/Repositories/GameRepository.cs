@@ -14,7 +14,7 @@ namespace SteamReleaseAnalytics.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<Game> GetGameByIdAsync(int steamAppId)
+        public async Task<Game?> GetGameByIdAsync(int steamAppId)
         {
             return await _context.Games
                 .Include(g => g.GameTags)

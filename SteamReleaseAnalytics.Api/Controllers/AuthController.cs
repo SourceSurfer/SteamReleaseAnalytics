@@ -31,6 +31,6 @@ namespace SteamReleaseAnalytics.Api.Controllers
 
     public class LoginRequest
     {
-        public string Username { get; set; }
+        public string Username { get; set; } = string.Empty;
     }
 }

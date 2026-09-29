@@ -10,7 +10,7 @@ namespace SteamReleaseAnalytics.Core.Models
 
         [Required]
         [MaxLength(100)]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         public ICollection<GameTag> GameTags { get; set; } = new List<GameTag>();
     }

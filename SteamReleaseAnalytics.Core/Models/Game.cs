@@ -11,22 +11,22 @@ namespace SteamReleaseAnalytics.Core.Models
 
         [Required]
         [MaxLength(500)]
-        public string Title { get; set; }
+        public string Title { get; set; } = string.Empty;
 
         [MaxLength(2000)]
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
         public DateTime? ReleaseDate { get; set; } = DateTime.UtcNow;
 
         [MaxLength(500)]
-        public string ImageUrl { get; set; }
+        public string? ImageUrl { get; set; }
 
         [MaxLength(500)]
-        public string StoreUrl { get; set; }
+        public string? StoreUrl { get; set; }
 
         public int Followers { get; set; }
 
-        public string Platforms { get; set; } // "Windows,Mac,Linux"
+        public string? Platforms { get; set; } // "Windows,Mac,Linux"
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

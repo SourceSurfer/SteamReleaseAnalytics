@@ -14,7 +14,7 @@ namespace SteamReleaseAnalytics.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<Tag> GetTagByNameAsync(string name)
+        public async Task<Tag?> GetTagByNameAsync(string name)
         {
             return await _context.Tags.FirstOrDefaultAsync(t => t.Name == name);
         }

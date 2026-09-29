@@ -11,11 +11,11 @@ namespace SteamReleaseAnalytics.Core.Models
         [ForeignKey("Game")]
         public int GameSteamAppId { get; set; }
 
-        public Game Game { get; set; }
+        public Game Game { get; set; } = null!;
 
         [ForeignKey("Tag")]
         public int TagId { get; set; }
 
-        public Tag Tag { get; set; }
+        public Tag Tag { get; set; } = null!;
     }
 }
