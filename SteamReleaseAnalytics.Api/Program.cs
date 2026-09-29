@@ -2,9 +2,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-using Npgsql;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
-
 using SteamReleaseAnalytics.Infrastructure.Data;
 using SteamReleaseAnalytics.Infrastructure.Repositories;
 using SteamReleaseAnalytics.Services.Security;

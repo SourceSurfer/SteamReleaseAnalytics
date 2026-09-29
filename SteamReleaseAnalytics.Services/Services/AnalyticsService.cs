@@ -6,16 +6,13 @@ namespace SteamReleaseAnalytics.Services.Services
     public class AnalyticsService : IAnalyticsService
     {
         private readonly IGameRepository _gameRepository;
-        private readonly IGameSnapshotRepository _snapshotRepository;
         private readonly TimeProvider _timeProvider;
 
         public AnalyticsService(
             IGameRepository gameRepository,
-            IGameSnapshotRepository snapshotRepository,
             TimeProvider timeProvider)
         {
             _gameRepository = gameRepository;
-            _snapshotRepository = snapshotRepository;
             _timeProvider = timeProvider;
         }
 

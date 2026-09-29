@@ -1,6 +1,49 @@
-@SteamReleaseAnalytics.Api_HostAddress = http://localhost:5268
+@host = http://localhost:5268
 
-GET {{SteamReleaseAnalytics.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Получить JWT токен
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
 
-###
+{
+  "username": "admin"
+}
+
+### Создать игру (нужен токен из запроса выше)
+POST {{host}}/api/v1/games
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.$.token}}
+
+{
+  "steamAppId": 1091500,
+  "title": "Cyberpunk 2077",
+  "description": "An open-world action RPG",
+  "releaseDate": "2025-11-15T00:00:00Z",
+  "imageUrl": "https://example.com/image.jpg",
+  "storeUrl": "https://store.steampowered.com/app/1091500",
+  "followers": 150000,
+  "platforms": "Windows,Mac",
+  "tags": ["Action", "RPG", "Sci-Fi"]
+}
+
+### Все игры
+GET {{host}}/api/v1/games
+
+### Игра по Steam App ID
+GET {{host}}/api/v1/games/1091500
+
+### Календарь релизов на месяц
+GET {{host}}/api/v1/games/calendar?month=2025-11
+
+### Игры по тегу
+GET {{host}}/api/v1/games/by-tag/RPG
+
+### Топ-5 жанров за месяц
+GET {{host}}/api/v1/analytics/top-genres?month=11&year=2025
+
+### Динамика топ-5 жанров за последние 3 месяца
+GET {{host}}/api/v1/analytics/genre-dynamics
+
+### Удалить игру
+DELETE {{host}}/api/v1/games/1091500
+Authorization: Bearer {{login.response.body.$.token}}
