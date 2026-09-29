@@ -9,7 +9,7 @@ Backend-сервис на ASP.NET Core для хранения и анализа
 - **Календарь релизов** - получение игр по месяцам с группировкой по дням
 - **Аналитика жанров** - топ-5 популярных жанров с статистикой
 - **Анализ динамики** - отслеживание изменений популярности жанров за 3 месяца
-- **JWT аутентификация** - POST и DELETE требуют токен (демо-логин, см. «Аутентификация»)
+- **JWT аутентификация** - POST и DELETE требуют токен с ролью Admin (демо-пользователь, см. «Аутентификация»)
 - **REST API** - стандартный API для интеграции с фронтенд-приложениями
 - **Swagger документация** - интерактивная документация API
 
@@ -133,7 +133,7 @@ dotnet ef database update --project SteamReleaseAnalytics.Infrastructure --start
 
 **POST** `/api/v1/auth/login`
 - Получить JWT токен для аутентификации
-- Body: `{"username": "admin"}`
+- Body: `{"username": "admin", "password": "admin"}`
 - Response: `{"token": "eyJhbGc..."}`
 
 ### Игры
@@ -175,17 +175,17 @@ dotnet ef database update --project SteamReleaseAnalytics.Infrastructure --start
 
 ## 🔐 Аутентификация
 
-API использует JWT токены для защиты изменяющих операций (POST, DELETE).
+API использует JWT токены для защиты изменяющих операций: POST и DELETE требуют токен с ролью `Admin` (без токена — 401, с другой ролью — 403).
 
-1. Получите токен через `/api/v1/auth/login`
+1. Получите токен через `/api/v1/auth/login` с логином и паролем демо-пользователя
 2. Добавьте токен в заголовок Authorization:
 ```
 Authorization: Bearer <ваш_токен>
 ```
 
-Токен действителен 60 минут (настраивается в `appsettings.json`).
+В Swagger UI токен вводится через кнопку **Authorize**. Токен действителен 60 минут (настраивается в `appsettings.json`).
 
-> **Демо-режим.** `/api/v1/auth/login` не проверяет пароль: токен с ролью `Admin` выдаётся для любого имени пользователя. Это сделано для удобства проверки API; для реального использования нужна проверка учётных данных.
+> **Демо-пользователь.** Учётная запись одна и задаётся конфигурацией `Auth:DemoUser`. В `launchSettings.json` и `docker-compose.yml` это `admin` / `admin`; в `appsettings.json` она пустая, и без неё вход отключён. Для реального использования нужно хранилище пользователей с хэшированными паролями.
 
 ## 🗄️ База данных
 
@@ -237,6 +237,8 @@ dotnet test
 
 Тесты не требуют ни PostgreSQL, ни сети: репозитории подменяются через NSubstitute, а сами репозитории проверяются на EF Core InMemory. Покрыты расчёт статистики жанров (`AnalyticsService`), выдача и проверка JWT (`JwtTokenGenerator`), выборка релизов по месяцу и тегу, календарь релизов и валидация запросов в контроллерах.
 
+Интеграционные тесты поднимают API целиком через `WebApplicationFactory` (с подменёнными репозиториями) и проверяют то, что живёт в конвейере ASP.NET Core: валидацию модели и ProblemDetails, вход и роли, отказ стартовать без секрета JWT, схему Bearer в Swagger и CORS.
+
 ## 🧪 Тестирование API
 
 ### Через Swagger UI
@@ -252,7 +254,7 @@ dotnet test
 
 1. **Получите токен**:
    - POST `http://localhost:8080/api/v1/auth/login`
-   - Body: `{"username": "admin"}`
+   - Body: `{"username": "admin", "password": "admin"}`
 
 2. **Используйте токен**:
    - Добавьте заголовок: `Authorization: Bearer <token>`
@@ -315,29 +317,38 @@ curl "http://localhost:8080/api/v1/analytics/top-genres?month=11&year=2025"
     "DefaultConnection": "Host=localhost;Port=5432;Database=steam_releases;Username=postgres;Password=postgres;"
   },
   "JwtSettings": {
-    "Secret": "your-super-secret-key-change-this-in-production-at-least-32-characters-long!!!",
+    "Secret": "",
     "ExpirationMinutes": 60,
     "Issuer": "SteamReleaseAnalytics",
     "Audience": "SteamReleaseAnalyticsUsers"
+  },
+  "Auth": {
+    "DemoUser": { "Username": "", "Password": "" }
+  },
+  "Cors": {
+    "AllowedOrigins": []
   }
 }
 ```
 
-Значения в `appsettings.json` — локальные значения по умолчанию для разработки, не секреты.
+Секретов в `appsettings.json` нет: строка подключения — локальное значение по умолчанию для разработки, а ключ подписи JWT и демо-учётка задаются снаружи. Для локального запуска и Docker Compose они уже прописаны в `launchSettings.json` и `docker-compose.yml` (значения только для разработки); в любой другой среде — через переменные окружения, например `JwtSettings__Secret`.
 
 | Параметр | Назначение |
 |---|---|
 | `ConnectionStrings:DefaultConnection` | Строка подключения к PostgreSQL |
-| `JwtSettings:*` | Ключ подписи, срок жизни, издатель и аудитория токенов |
+| `JwtSettings:Secret` | Ключ подписи JWT, не короче 32 символов. **Обязателен**: без него приложение не стартует |
+| `JwtSettings:*` | Срок жизни, издатель и аудитория токенов |
+| `Auth:DemoUser:Username` / `Password` | Демо-учётка для `/api/v1/auth/login`; пустая — вход отключён |
+| `Cors:AllowedOrigins` | Список origin, которым разрешены кросс-доменные запросы; пустой — CORS выключен |
 | `Database:ApplyMigrationsOnStartup` | `true` — применять миграции при старте (по умолчанию выключено; включено в `launchSettings.json` и `docker-compose.yml`) |
 
 ## 🚨 Важные замечания
 
 - **Среда**: Production в Docker (без HTTPS для упрощения)
 - **Безопасность**: В Production используйте настоящие сертификаты HTTPS
-- **Секрет JWT**: Измените `JwtSettings.Secret` на длинный, случайный ключ (например, через переменную окружения `JwtSettings__Secret`)
+- **Секрет JWT**: Значение из `launchSettings.json` / `docker-compose.yml` — только для разработки; в других средах задайте свой случайный ключ через `JwtSettings__Secret`
 - **БД Backup**: Используйте volume для PostgreSQL для сохранения данных
-- **CORS**: Открыт для всех источников во всех средах (демо-настройка)
+- **CORS**: Разрешён только для origin из `Cors:AllowedOrigins` (по умолчанию список пуст)
 - **Swagger**: Включён во всех средах, включая Production
 
 ## 📈 Будущие улучшения

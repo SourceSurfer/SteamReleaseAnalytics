@@ -39,6 +39,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - Database__ApplyMigrationsOnStartup=true
+      - JwtSettings__Secret=local-development-only-jwt-secret-do-not-use-in-production
+      - Auth__DemoUser__Username=admin
+      - Auth__DemoUser__Password=admin
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=steam_releases;Username=postgres;Password=postgres;
     ports:
       - "8080:8080"

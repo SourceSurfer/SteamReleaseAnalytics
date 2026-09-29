@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using SteamReleaseAnalytics.Api.Auth;
 using SteamReleaseAnalytics.Api.Validation;
 using SteamReleaseAnalytics.Core.Dtos;
 using SteamReleaseAnalytics.Core.Models;
@@ -90,7 +91,7 @@ namespace SteamReleaseAnalytics.Api.Controllers
         /// Создать новую игру
         /// </summary>
         [HttpPost]
-        [Authorize]
+        [Authorize(Roles = Roles.Admin)]
         public async Task<ActionResult<GameDto>> CreateGame([FromBody] CreateGameDto createDto)
         {
             if (await _gameRepository.GameExistsAsync(createDto.SteamAppId))
@@ -126,7 +127,7 @@ namespace SteamReleaseAnalytics.Api.Controllers
         /// Удалить игру
         /// </summary>
         [HttpDelete("{id}")]
-        [Authorize]
+        [Authorize(Roles = Roles.Admin)]
         public async Task<IActionResult> DeleteGame(int id)
         {
             if (!await _gameRepository.GameExistsAsync(id))

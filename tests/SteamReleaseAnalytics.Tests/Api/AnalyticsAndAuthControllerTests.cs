@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
+using SteamReleaseAnalytics.Api.Auth;
 using SteamReleaseAnalytics.Api.Controllers;
 using SteamReleaseAnalytics.Core.Dtos;
 using SteamReleaseAnalytics.Services.Security;
@@ -50,26 +52,51 @@ namespace SteamReleaseAnalytics.Tests.Api
     {
         private readonly IJwtTokenGenerator _tokenGenerator = Substitute.For<IJwtTokenGenerator>();
 
+        private AuthController Controller(string username = "alice", string password = "s3cret") =>
+            new(_tokenGenerator, Options.Create(new DemoUserOptions { Username = username, Password = password }));
+
         [Theory]
-        [InlineData(null)]
-        [InlineData("")]
-        public void Login_WithoutUsername_ReturnsBadRequest(string? username)
+        [InlineData(null, "s3cret")]
+        [InlineData("", "s3cret")]
+        [InlineData("alice", null)]
+        [InlineData("alice", "")]
+        public void Login_WithoutUsernameOrPassword_ReturnsBadRequest(string? username, string? password)
         {
-            var response = new AuthController(_tokenGenerator).Login(new LoginRequest { Username = username! });
+            var response = Controller().Login(new LoginRequest { Username = username!, Password = password! });
 
             response.Should().BeOfType<BadRequestObjectResult>();
             _tokenGenerator.DidNotReceiveWithAnyArgs().GenerateToken(default!, default!);
         }
 
         [Fact]
-        public void Login_IssuesAdminTokenForUsername()
+        public void Login_WithDemoCredentials_IssuesAdminToken()
         {
             _tokenGenerator.GenerateToken("alice", "Admin").Returns("signed-token");
 
-            var response = new AuthController(_tokenGenerator).Login(new LoginRequest { Username = "alice" });
+            var response = Controller().Login(new LoginRequest { Username = "alice", Password = "s3cret" });
 
             response.Should().BeOfType<OkObjectResult>()
                 .Which.Value.Should().BeEquivalentTo(new { token = "signed-token" });
+        }
+
+        [Theory]
+        [InlineData("alice", "wrong")]
+        [InlineData("mallory", "s3cret")]
+        [InlineData("Alice", "s3cret")]
+        public void Login_WithWrongCredentials_ReturnsUnauthorized(string username, string password)
+        {
+            var response = Controller().Login(new LoginRequest { Username = username, Password = password });
+
+            response.Should().BeOfType<UnauthorizedResult>();
+            _tokenGenerator.DidNotReceiveWithAnyArgs().GenerateToken(default!, default!);
+        }
+
+        [Fact]
+        public void Login_WhenDemoUserIsNotConfigured_RejectsEveryone()
+        {
+            var response = Controller(username: "", password: "").Login(new LoginRequest { Username = "alice", Password = "s3cret" });
+
+            response.Should().BeOfType<UnauthorizedResult>();
         }
     }
 }
