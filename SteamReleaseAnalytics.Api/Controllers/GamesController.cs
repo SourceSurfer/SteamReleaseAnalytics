@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using SteamReleaseAnalytics.Api.Validation;
 using SteamReleaseAnalytics.Core.Dtos;
 using SteamReleaseAnalytics.Core.Models;
 using SteamReleaseAnalytics.Infrastructure.Repositories;
@@ -52,8 +53,8 @@ namespace SteamReleaseAnalytics.Api.Controllers
         [HttpGet("calendar")]
         public async Task<ActionResult<GameCalendarDto>> GetGameCalendar([FromQuery] string month)
         {
-            if (!DateTime.TryParse($"{month}-01", out var date))
-                return BadRequest("Неверный формат месяца. Используйте: YYYY-MM");
+            if (!ReleasePeriod.TryParseMonth(month, out var date))
+                return BadRequest($"Неверный месяц. Используйте формат YYYY-MM, {ReleasePeriod.YearRangeMessage.ToLowerInvariant()}");
 
             var games = await _gameRepository.GetGamesByMonthAsync(date.Year, date.Month);
 
@@ -100,7 +101,7 @@ namespace SteamReleaseAnalytics.Api.Controllers
                 SteamAppId = createDto.SteamAppId,
                 Title = createDto.Title,
                 Description = createDto.Description,
-                ReleaseDate = createDto.ReleaseDate,
+                ReleaseDate = ToUtc(createDto.ReleaseDate),
                 ImageUrl = createDto.ImageUrl,
                 StoreUrl = createDto.StoreUrl,
                 Followers = createDto.Followers,
@@ -109,14 +110,11 @@ namespace SteamReleaseAnalytics.Api.Controllers
                 UpdatedAt = DateTime.UtcNow
             };
 
-            // Добавить теги
-            if (createDto.Tags.Any())
+            // Новые теги сохраняются вместе с игрой одним SaveChanges
+            foreach (var tagName in createDto.Tags.Select(t => t.Trim()).Distinct())
             {
-                foreach (var tagName in createDto.Tags)
-                {
-                    var tag = await _tagRepository.GetOrCreateTagAsync(tagName);
-                    game.GameTags.Add(new GameTag { Tag = tag });
-                }
+                var tag = await _tagRepository.GetOrCreateTagAsync(tagName);
+                game.GameTags.Add(new GameTag { Tag = tag });
             }
 
             await _gameRepository.AddGameAsync(game);
@@ -137,6 +135,14 @@ namespace SteamReleaseAnalytics.Api.Controllers
             await _gameRepository.DeleteGameAsync(id);
             return NoContent();
         }
+
+        // PostgreSQL хранит timestamptz только в UTC; дата без часового пояса считается UTC
+        private static DateTime? ToUtc(DateTime? value) => value switch
+        {
+            null => null,
+            { Kind: DateTimeKind.Local } local => local.ToUniversalTime(),
+            { } other => DateTime.SpecifyKind(other, DateTimeKind.Utc)
+        };
 
         private GameDto MapToDto(Game game)
         {

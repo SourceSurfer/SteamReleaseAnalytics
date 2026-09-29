@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 
+using SteamReleaseAnalytics.Api.Validation;
 using SteamReleaseAnalytics.Core.Dtos;
 using SteamReleaseAnalytics.Services.Services;
 
@@ -24,6 +25,9 @@ namespace SteamReleaseAnalytics.Api.Controllers
         {
             if (month < 1 || month > 12)
                 return BadRequest("Месяц должен быть от 1 до 12");
+
+            if (!ReleasePeriod.IsSupportedYear(year))
+                return BadRequest(ReleasePeriod.YearRangeMessage);
 
             var stats = await _analyticsService.GetTopGenresAsync(month, year);
             return Ok(stats);

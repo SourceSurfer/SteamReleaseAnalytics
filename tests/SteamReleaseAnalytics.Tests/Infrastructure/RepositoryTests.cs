@@ -127,7 +127,9 @@ namespace SteamReleaseAnalytics.Tests.Infrastructure
             int firstId;
             await using (var context = NewContext())
             {
-                firstId = (await new TagRepository(context).GetOrCreateTagAsync("Roguelike")).Id;
+                var created = await new TagRepository(context).GetOrCreateTagAsync("Roguelike");
+                await context.SaveChangesAsync();
+                firstId = created.Id;
             }
 
             await using var second = NewContext();
@@ -135,6 +137,47 @@ namespace SteamReleaseAnalytics.Tests.Infrastructure
 
             again.Id.Should().Be(firstId);
             (await second.Tags.CountAsync()).Should().Be(1);
+        }
+
+        [Fact]
+        public async Task GetOrCreateTag_DoesNotSaveNewTagOnItsOwn()
+        {
+            await using (var context = NewContext())
+            {
+                await new TagRepository(context).GetOrCreateTagAsync("Roguelike");
+            }
+
+            await using var check = NewContext();
+            (await check.Tags.CountAsync()).Should().Be(0);
+        }
+
+        [Fact]
+        public async Task GetOrCreateTag_SameNewNameTwiceBeforeSave_ReturnsSameTag()
+        {
+            await using var context = NewContext();
+            var repository = new TagRepository(context);
+
+            var first = await repository.GetOrCreateTagAsync("Roguelike");
+            var second = await repository.GetOrCreateTagAsync("Roguelike");
+
+            second.Should().BeSameAs(first);
+        }
+
+        [Fact]
+        public async Task AddGame_SavesNewTagsTogetherWithGame()
+        {
+            await using (var context = NewContext())
+            {
+                var tag = await new TagRepository(context).GetOrCreateTagAsync("Roguelike");
+                var game = Game(1, 10);
+                game.GameTags.Add(new Core.Models.GameTag { Game = game, Tag = tag });
+                await new GameRepository(context).AddGameAsync(game);
+            }
+
+            await using var check = NewContext();
+            var saved = await new GameRepository(check).GetGameByIdAsync(1);
+            saved!.GameTags.Select(gt => gt.Tag.Name).Should().Equal("Roguelike");
+            (await check.Tags.CountAsync()).Should().Be(1);
         }
     }
 }

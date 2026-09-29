@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -75,6 +76,10 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
     using var scope = app.Services.CreateScope();
     scope.ServiceProvider.GetRequiredService<SteamDbContext>().Database.Migrate();
 }
+
+// Unhandled exceptions and bare status codes become RFC 7807 problem details, without stack traces
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 // Enable Swagger for both Development and Production
 app.UseSwagger();

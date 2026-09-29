@@ -24,13 +24,18 @@ namespace SteamReleaseAnalytics.Infrastructure.Repositories
             return await _context.Tags.ToListAsync();
         }
 
+        /// <summary>
+        /// Находит тег или добавляет новый в контекст без сохранения:
+        /// он запишется тем же SaveChanges, что и игра, которая на него ссылается.
+        /// </summary>
         public async Task<Tag> GetOrCreateTagAsync(string name)
         {
-            var tag = await GetTagByNameAsync(name);
+            var tag = _context.Tags.Local.FirstOrDefault(t => t.Name == name)
+                ?? await GetTagByNameAsync(name);
             if (tag == null)
             {
                 tag = new Tag { Name = name };
-                await AddTagAsync(tag);
+                _context.Tags.Add(tag);
             }
             return tag;
         }

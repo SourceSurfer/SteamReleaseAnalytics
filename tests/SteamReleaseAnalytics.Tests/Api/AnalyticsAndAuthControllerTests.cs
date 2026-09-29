@@ -22,6 +22,18 @@ namespace SteamReleaseAnalytics.Tests.Api
             await _analyticsService.DidNotReceiveWithAnyArgs().GetTopGenresAsync(default, default);
         }
 
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1969)]
+        [InlineData(2101)]
+        public async Task GetTopGenres_YearOutOfRange_ReturnsBadRequestWithoutCallingService(int year)
+        {
+            var response = await new AnalyticsController(_analyticsService).GetTopGenres(1, year);
+
+            response.Result.Should().BeOfType<BadRequestObjectResult>();
+            await _analyticsService.DidNotReceiveWithAnyArgs().GetTopGenresAsync(default, default);
+        }
+
         [Fact]
         public async Task GetTopGenres_ValidMonth_ReturnsServiceResult()
         {
