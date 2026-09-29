@@ -7,6 +7,6 @@ namespace SteamReleaseAnalytics.Infrastructure.Repositories
         Task<List<GameSnapshot>> GetSnapshotsByGameAsync(int steamAppId);
         Task<List<GameSnapshot>> GetSnapshotsByDateRangeAsync(DateTime startDate, DateTime endDate);
         Task AddSnapshotAsync(GameSnapshot snapshot);
-        Task<List<GameSnapshot>> GetLatestSnapshotsByMonthAsync(int year, int month);
+        Task<List<GameSnapshot>> GetSnapshotsByMonthAsync(int year, int month);
     }
 }

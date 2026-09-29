@@ -33,10 +33,10 @@ namespace SteamReleaseAnalytics.Infrastructure.Repositories
         public async Task<List<Game>> GetGamesByMonthAsync(int year, int month)
         {
             var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var endDate = startDate.AddMonths(1).AddDays(-1);
+            var nextMonth = startDate.AddMonths(1);
 
             return await _context.Games
-                .Where(g => g.ReleaseDate >= startDate && g.ReleaseDate <= endDate)
+                .Where(g => g.ReleaseDate >= startDate && g.ReleaseDate < nextMonth)
                 .Include(g => g.GameTags)
                 .ThenInclude(gt => gt.Tag)
                 .OrderBy(g => g.ReleaseDate)

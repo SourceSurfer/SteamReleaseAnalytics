@@ -154,6 +154,20 @@ namespace SteamReleaseAnalytics.Tests.Services
         }
 
         [Fact]
+        public async Task GetGenreDynamics_KeepsMostPopularGenreThatAppearsAfterFiveOthers()
+        {
+            GivenGames(2025, 11,
+                Game(1, 10, "A", "B", "C", "D", "E"),
+                Game(2, 10, "Big"), Game(3, 10, "Big"), Game(4, 10, "Big"));
+
+            var result = await _service.GetGenreDynamicsAsync();
+
+            result.Should().HaveCount(5);
+            result[0].Genre.Should().Be("Big");
+            result[0].MonthlyStats.Should().ContainSingle().Which.GameCount.Should().Be(3);
+        }
+
+        [Fact]
         public async Task GetGenreDynamics_OrdersByTotalGamesAcrossMonthsAndKeepsTopFive()
         {
             GivenGames(2025, 9,

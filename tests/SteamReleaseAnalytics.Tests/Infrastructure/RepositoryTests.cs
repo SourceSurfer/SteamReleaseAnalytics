@@ -47,6 +47,37 @@ namespace SteamReleaseAnalytics.Tests.Infrastructure
         }
 
         [Fact]
+        public async Task GetGamesByMonth_IncludesReleasesLaterOnTheLastDayOfMonth()
+        {
+            await SeedAsync(
+                Game(1, 10, Utc(2025, 11, 30, 15)),
+                Game(2, 10, Utc(2025, 12, 1)));
+
+            await using var context = NewContext();
+            var games = await new GameRepository(context).GetGamesByMonthAsync(2025, 11);
+
+            games.Select(g => g.SteamAppId).Should().Equal(1);
+        }
+
+        [Fact]
+        public async Task GetSnapshotsByMonth_IncludesSnapshotsLaterOnTheLastDayOfMonth()
+        {
+            await SeedAsync(Game(1, 10));
+            await using (var seed = NewContext())
+            {
+                seed.GameSnapshots.AddRange(
+                    new Core.Models.GameSnapshot { GameSteamAppId = 1, FollowersCount = 5, SnapshotDate = Utc(2025, 11, 30, 15) },
+                    new Core.Models.GameSnapshot { GameSteamAppId = 1, FollowersCount = 6, SnapshotDate = Utc(2025, 12, 1) });
+                await seed.SaveChangesAsync();
+            }
+
+            await using var context = NewContext();
+            var snapshots = await new GameSnapshotRepository(context).GetSnapshotsByMonthAsync(2025, 11);
+
+            snapshots.Select(s => s.FollowersCount).Should().Equal(5);
+        }
+
+        [Fact]
         public async Task GetGamesByMonth_LoadsTagsOfReturnedGames()
         {
             await SeedAsync(Game(1, 10, Utc(2025, 11, 15), "Action", "RPG"));
