@@ -2,26 +2,27 @@
 
 [![CI](https://github.com/SourceSurfer/SteamReleaseAnalytics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SourceSurfer/SteamReleaseAnalytics/actions/workflows/ci.yml?query=branch%3Amain) [![Tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FSourceSurfer%2FSteamReleaseAnalytics%2Fbadges%2Ftests.json)](https://github.com/SourceSurfer/SteamReleaseAnalytics/actions/workflows/ci.yml?query=branch%3Amain)
 
-Backend-сервис для сбора, агрегации и анализа данных о релизах игр на Steam. Приложение предоставляет REST API для получения информации о будущих релизах, статистики по жанрам и анализа динамики изменений.
+Backend-сервис на ASP.NET Core для хранения и анализа данных о релизах игр в Steam: календарь релизов по месяцам, статистика и динамика популярности жанров. Данные об играх вносятся через REST API; автоматический сбор из Steam — в планах (см. «Будущие улучшения»).
 
 ## 🎯 Основные возможности
 
 - **Календарь релизов** - получение игр по месяцам с группировкой по дням
 - **Аналитика жанров** - топ-5 популярных жанров с статистикой
 - **Анализ динамики** - отслеживание изменений популярности жанров за 3 месяца
-- **JWT аутентификация** - защита критических эндпоинтов
+- **JWT аутентификация** - POST и DELETE требуют токен (демо-логин, см. «Аутентификация»)
 - **REST API** - стандартный API для интеграции с фронтенд-приложениями
 - **Swagger документация** - интерактивная документация API
 
 ## 🛠️ Технологический стек
 
-- **Backend**: C# и ASP.NET Core 8
-- **ORM**: Entity Framework Core 8.0.4
-- **Database**: PostgreSQL 16 (основная БД), ClickHouse (для аналитики)
+- **Backend**: C# и ASP.NET Core 10 (.NET 10 LTS)
+- **ORM**: Entity Framework Core 10 + Npgsql, миграции в репозитории
+- **Database**: PostgreSQL 16
 - **Аутентификация**: JWT токены
 - **Контейнеризация**: Docker и Docker Compose
-- **API документация**: Swagger / OpenAPI
-- **Архитектура**: Микросервисная архитектура (расширяемость), модульная структура
+- **API документация**: Swagger / OpenAPI (Swashbuckle)
+- **Тесты**: xUnit, NSubstitute, FluentAssertions, EF Core InMemory
+- **Архитектура**: монолит с разделением на проекты Api / Services / Infrastructure / Core
 
 ## 📋 Структура проекта
 
@@ -33,8 +34,9 @@ SteamReleaseAnalytics/
 │   │   ├── AnalyticsController.cs       # Эндпоинты аналитики
 │   │   └── AuthController.cs            # Аутентификация
 │   ├── Program.cs                       # Конфигурация приложения
+│   ├── SteamReleaseAnalytics.Api.http   # Готовые запросы к API (VS / Rider / VS Code REST Client)
 │   └── appsettings.json                 # Настройки
-├── SteamReleaseAnalytics.Core/          # Бизнес-логика и модели
+├── SteamReleaseAnalytics.Core/          # Модели и DTO
 │   ├── Models/                          # Entity модели
 │   │   ├── Game.cs
 │   │   ├── Tag.cs
@@ -49,7 +51,7 @@ SteamReleaseAnalytics/
 ├── SteamReleaseAnalytics.Infrastructure/# Работа с БД и репозитории
 │   ├── Data/
 │   │   └── SteamDbContext.cs            # Entity Framework контекст
-│   ├── Migrations/                      # Миграции БД
+│   ├── Migrations/                      # Миграции БД (EF Core)
 │   └── Repositories/                    # Репозитории
 │       ├── IGameRepository.cs
 │       ├── GameRepository.cs
@@ -66,6 +68,7 @@ SteamReleaseAnalytics/
 │       └── JwtTokenGenerator.cs
 ├── tests/SteamReleaseAnalytics.Tests/   # Юнит-тесты (xUnit, NSubstitute, FluentAssertions)
 ├── .github/workflows/ci.yml             # CI: сборка, тесты, значок числа тестов
+├── dotnet-tools.json                    # Локальный инструмент dotnet-ef
 ├── docker-compose.yml                   # Docker Compose конфигурация
 ├── Dockerfile                           # Docker образ для API
 └── README.md                            # Документация
@@ -76,8 +79,7 @@ SteamReleaseAnalytics/
 ### Требования
 
 - Docker Desktop (или Docker + Docker Compose)
-- .NET 8 SDK (для локальной разработки)
-- PostgreSQL 16 (если запускать без Docker)
+- .NET 10 SDK (для локальной разработки)
 
 ### Запуск через Docker Compose
 
@@ -88,38 +90,42 @@ cd SteamReleaseAnalytics
 
 2. **Запустите контейнеры**:
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 Это автоматически:
 - Запустит PostgreSQL базу данных
 - Запустит pgAdmin для управления БД
 - Соберёт и запустит API приложение
-- Создаст все необходимые таблицы
+- Применит миграции и создаст все необходимые таблицы
 
 3. **Откройте приложение**:
 - **API и Swagger**: http://localhost:8080/swagger/index.html
 - **pgAdmin**: http://localhost:5050 (admin@example.com / admin)
 - **PostgreSQL**: localhost:5432 (postgres / postgres)
 
-### Запуск локально (без Docker)
+### Запуск локально (API без Docker)
 
-1. **Установите зависимости**:
+1. **Поднимите PostgreSQL** — из Docker Compose или свой PostgreSQL 16 с настройками из `appsettings.json`:
 ```bash
-dotnet restore
+docker compose up -d postgres
 ```
 
-2. **Создайте и примените миграции**:
-```bash
-dotnet ef database update --project SteamReleaseAnalytics.Infrastructure --startup-project SteamReleaseAnalytics.Api
-```
-
-3. **Запустите API**:
+2. **Запустите API**:
 ```bash
 dotnet run --project SteamReleaseAnalytics.Api
 ```
 
-API будет доступна на: https://localhost:7205/swagger/index.html
+Миграции применяются при старте автоматически (переменная `Database__ApplyMigrationsOnStartup` задана в `Properties/launchSettings.json`).
+
+API будет доступна на: http://localhost:5268/swagger/index.html
+(HTTPS: `dotnet run --project SteamReleaseAnalytics.Api --launch-profile https` → https://localhost:7205/swagger/index.html)
+
+Применить миграции вручную, без запуска API:
+```bash
+dotnet tool restore
+dotnet ef database update --project SteamReleaseAnalytics.Infrastructure --startup-project SteamReleaseAnalytics.Api
+```
 
 ## 📚 API Эндпоинты
 
@@ -169,7 +175,7 @@ API будет доступна на: https://localhost:7205/swagger/index.html
 
 ## 🔐 Аутентификация
 
-API использует JWT токены для защиты критических операций (POST, DELETE).
+API использует JWT токены для защиты изменяющих операций (POST, DELETE).
 
 1. Получите токен через `/api/v1/auth/login`
 2. Добавьте токен в заголовок Authorization:
@@ -179,14 +185,18 @@ Authorization: Bearer <ваш_токен>
 
 Токен действителен 60 минут (настраивается в `appsettings.json`).
 
+> **Демо-режим.** `/api/v1/auth/login` не проверяет пароль: токен с ролью `Admin` выдаётся для любого имени пользователя. Это сделано для удобства проверки API; для реального использования нужна проверка учётных данных.
+
 ## 🗄️ База данных
+
+Схема создаётся миграциями EF Core из `SteamReleaseAnalytics.Infrastructure/Migrations`.
 
 ### Таблицы
 
 - **Games** - основная таблица с информацией об играх
 - **Tags** - теги/жанры игр
 - **GameTags** - связь между играми и тегами (M:N)
-- **GameSnapshots** - исторические данные для анализа динамики
+- **GameSnapshots** - исторические данные о числе подписчиков (зарезервировано под сбор данных из Steam, API пока не использует)
 
 ### Схема базы данных
 
@@ -234,6 +244,10 @@ dotnet test
 1. Откройте http://localhost:8080/swagger/index.html
 2. Используйте интерактивный интерфейс для тестирования эндпоинтов
 
+### Через .http файл
+
+`SteamReleaseAnalytics.Api/SteamReleaseAnalytics.Api.http` содержит готовые запросы ко всем эндпоинтам; токен из запроса логина подставляется автоматически. Адрес по умолчанию — локальный запуск (`http://localhost:5268`); для Docker замените `@host` на `http://localhost:8080`.
+
 ### Через Postman
 
 1. **Получите токен**:
@@ -271,7 +285,7 @@ curl http://localhost:8080/api/v1/games/calendar?month=2025-11
 
 **Получить топ жанров**:
 ```bash
-curl http://localhost:8080/api/v1/analytics/top-genres?month=11&year=2025
+curl "http://localhost:8080/api/v1/analytics/top-genres?month=11&year=2025"
 ```
 
 ## 📊 Архитектура
@@ -309,13 +323,22 @@ curl http://localhost:8080/api/v1/analytics/top-genres?month=11&year=2025
 }
 ```
 
+Значения в `appsettings.json` — локальные значения по умолчанию для разработки, не секреты.
+
+| Параметр | Назначение |
+|---|---|
+| `ConnectionStrings:DefaultConnection` | Строка подключения к PostgreSQL |
+| `JwtSettings:*` | Ключ подписи, срок жизни, издатель и аудитория токенов |
+| `Database:ApplyMigrationsOnStartup` | `true` — применять миграции при старте (по умолчанию выключено; включено в `launchSettings.json` и `docker-compose.yml`) |
+
 ## 🚨 Важные замечания
 
 - **Среда**: Production в Docker (без HTTPS для упрощения)
 - **Безопасность**: В Production используйте настоящие сертификаты HTTPS
-- **Секрет JWT**: Измените `JwtSettings.Secret` на длинный, случайный ключ
+- **Секрет JWT**: Измените `JwtSettings.Secret` на длинный, случайный ключ (например, через переменную окружения `JwtSettings__Secret`)
 - **БД Backup**: Используйте volume для PostgreSQL для сохранения данных
-- **CORS**: Настроен на все источники для разработки
+- **CORS**: Открыт для всех источников во всех средах (демо-настройка)
+- **Swagger**: Включён во всех средах, включая Production
 
 ## 📈 Будущие улучшения
 
@@ -328,11 +351,11 @@ curl http://localhost:8080/api/v1/analytics/top-genres?month=11&year=2025
 
 ## 📝 Лицензия
 
-MIT
+[MIT](LICENSE)
 
 ## 👨‍💻 Автор
 
-Steam Release Analytics Backend - Тестовое задание
+[SourceSurfer](https://github.com/SourceSurfer)
 
 ---
 

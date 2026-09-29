@@ -9,7 +9,6 @@ namespace SteamReleaseAnalytics.Tests.Services
     public class AnalyticsServiceTests
     {
         private readonly IGameRepository _gameRepository = Substitute.For<IGameRepository>();
-        private readonly IGameSnapshotRepository _snapshotRepository = Substitute.For<IGameSnapshotRepository>();
         private readonly TimeProvider _timeProvider = Substitute.For<TimeProvider>();
         private readonly AnalyticsService _service;
 
@@ -19,7 +18,7 @@ namespace SteamReleaseAnalytics.Tests.Services
             _gameRepository.GetGamesByMonthAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(new List<Game>());
             SetNow(new DateTime(2025, 11, 20, 12, 0, 0, DateTimeKind.Utc));
 
-            _service = new AnalyticsService(_gameRepository, _snapshotRepository, _timeProvider);
+            _service = new AnalyticsService(_gameRepository, _timeProvider);
         }
 
         private void SetNow(DateTime utcNow) =>

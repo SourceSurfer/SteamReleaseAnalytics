@@ -13,7 +13,6 @@ namespace SteamReleaseAnalytics.Tests.Api
     {
         private readonly IGameRepository _gameRepository = Substitute.For<IGameRepository>();
         private readonly ITagRepository _tagRepository = Substitute.For<ITagRepository>();
-        private readonly IGameSnapshotRepository _snapshotRepository = Substitute.For<IGameSnapshotRepository>();
         private readonly GamesController _controller;
 
         public GamesControllerTests()
@@ -21,7 +20,7 @@ namespace SteamReleaseAnalytics.Tests.Api
             _tagRepository.GetOrCreateTagAsync(Arg.Any<string>())
                 .Returns(call => new Tag { Name = call.Arg<string>() });
 
-            _controller = new GamesController(_gameRepository, _tagRepository, _snapshotRepository);
+            _controller = new GamesController(_gameRepository, _tagRepository);
         }
 
         [Fact]

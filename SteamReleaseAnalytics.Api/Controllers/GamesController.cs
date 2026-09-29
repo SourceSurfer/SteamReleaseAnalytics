@@ -13,16 +13,13 @@ namespace SteamReleaseAnalytics.Api.Controllers
     {
         private readonly IGameRepository _gameRepository;
         private readonly ITagRepository _tagRepository;
-        private readonly IGameSnapshotRepository _snapshotRepository;
 
         public GamesController(
             IGameRepository gameRepository,
-            ITagRepository tagRepository,
-            IGameSnapshotRepository snapshotRepository)
+            ITagRepository tagRepository)
         {
             _gameRepository = gameRepository;
             _tagRepository = tagRepository;
-            _snapshotRepository = snapshotRepository;
         }
 
         /// <summary>
