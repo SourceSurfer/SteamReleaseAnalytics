@@ -12,7 +12,7 @@ namespace SteamReleaseAnalytics.Core.Models
         [ForeignKey("Game")]
         public int GameSteamAppId { get; set; }
 
-        public Game Game { get; set; }
+        public Game Game { get; set; } = null!;
 
         public int FollowersCount { get; set; }
 

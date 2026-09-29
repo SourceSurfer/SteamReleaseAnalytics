@@ -48,6 +48,11 @@ namespace SteamReleaseAnalytics.Tests.Api
         [Theory]
         [InlineData("abc")]
         [InlineData("2025-13")]
+        [InlineData("2025-11-30")]
+        [InlineData("2025-1")]
+        [InlineData("11/2025")]
+        [InlineData("2101-01")]
+        [InlineData("")]
         public async Task GetGameCalendar_InvalidMonth_ReturnsBadRequestWithoutQuery(string month)
         {
             var response = await _controller.GetGameCalendar(month);
@@ -125,6 +130,31 @@ namespace SteamReleaseAnalytics.Tests.Api
             created.RouteValues!["id"].Should().Be(42);
             created.Value.Should().BeOfType<GameDto>()
                 .Which.Tags.Should().Equal("Action", "Indie");
+        }
+
+        [Fact]
+        public async Task CreateGame_ReleaseDateWithoutTimeZone_IsStoredAsUtc()
+        {
+            var dto = new CreateGameDto { SteamAppId = 42, Title = "New Game", ReleaseDate = new DateTime(2025, 11, 20, 18, 0, 0) };
+
+            await _controller.CreateGame(dto);
+
+            await _gameRepository.Received(1).AddGameAsync(Arg.Is<Game>(g =>
+                g.ReleaseDate == new DateTime(2025, 11, 20, 18, 0, 0, DateTimeKind.Utc) &&
+                g.ReleaseDate!.Value.Kind == DateTimeKind.Utc));
+        }
+
+        [Fact]
+        public async Task CreateGame_DuplicateTags_AreTrimmedAndAddedOnce()
+        {
+            var dto = new CreateGameDto { SteamAppId = 42, Title = "New Game", Tags = new List<string> { "RPG", " RPG ", "Indie" } };
+
+            await _controller.CreateGame(dto);
+
+            await _tagRepository.Received(1).GetOrCreateTagAsync("RPG");
+            await _tagRepository.Received(1).GetOrCreateTagAsync("Indie");
+            await _gameRepository.Received(1).AddGameAsync(Arg.Is<Game>(g =>
+                g.GameTags.Select(gt => gt.Tag.Name).SequenceEqual(new[] { "RPG", "Indie" })));
         }
 
         [Fact]

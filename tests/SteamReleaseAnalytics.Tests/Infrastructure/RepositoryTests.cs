@@ -47,6 +47,59 @@ namespace SteamReleaseAnalytics.Tests.Infrastructure
         }
 
         [Fact]
+        public async Task GetGamesByMonth_IncludesReleasesLaterOnTheLastDayOfMonth()
+        {
+            await SeedAsync(
+                Game(1, 10, Utc(2025, 11, 30, 15)),
+                Game(2, 10, Utc(2025, 12, 1)));
+
+            await using var context = NewContext();
+            var games = await new GameRepository(context).GetGamesByMonthAsync(2025, 11);
+
+            games.Select(g => g.SteamAppId).Should().Equal(1);
+        }
+
+        [Fact]
+        public async Task GetSnapshotsByMonth_IncludesSnapshotsLaterOnTheLastDayOfMonth()
+        {
+            await SeedAsync(Game(1, 10));
+            await using (var seed = NewContext())
+            {
+                seed.GameSnapshots.AddRange(
+                    new Core.Models.GameSnapshot { GameSteamAppId = 1, FollowersCount = 5, SnapshotDate = Utc(2025, 11, 30, 15) },
+                    new Core.Models.GameSnapshot { GameSteamAppId = 1, FollowersCount = 6, SnapshotDate = Utc(2025, 12, 1) });
+                await seed.SaveChangesAsync();
+            }
+
+            await using var context = NewContext();
+            var snapshots = await new GameSnapshotRepository(context).GetSnapshotsByMonthAsync(2025, 11);
+
+            snapshots.Select(s => s.FollowersCount).Should().Equal(5);
+        }
+
+        [Theory]
+        [InlineData(nameof(Core.Models.Game.Description))]
+        [InlineData(nameof(Core.Models.Game.ImageUrl))]
+        [InlineData(nameof(Core.Models.Game.StoreUrl))]
+        [InlineData(nameof(Core.Models.Game.Platforms))]
+        public void GameModel_OptionalColumnsAreNullable(string property)
+        {
+            using var context = NewContext();
+
+            context.Model.FindEntityType(typeof(Core.Models.Game))!.FindProperty(property)!
+                .IsNullable.Should().BeTrue();
+        }
+
+        [Fact]
+        public void GameModel_TitleIsRequired()
+        {
+            using var context = NewContext();
+
+            context.Model.FindEntityType(typeof(Core.Models.Game))!.FindProperty(nameof(Core.Models.Game.Title))!
+                .IsNullable.Should().BeFalse();
+        }
+
+        [Fact]
         public async Task GetGamesByMonth_LoadsTagsOfReturnedGames()
         {
             await SeedAsync(Game(1, 10, Utc(2025, 11, 15), "Action", "RPG"));
@@ -96,7 +149,9 @@ namespace SteamReleaseAnalytics.Tests.Infrastructure
             int firstId;
             await using (var context = NewContext())
             {
-                firstId = (await new TagRepository(context).GetOrCreateTagAsync("Roguelike")).Id;
+                var created = await new TagRepository(context).GetOrCreateTagAsync("Roguelike");
+                await context.SaveChangesAsync();
+                firstId = created.Id;
             }
 
             await using var second = NewContext();
@@ -104,6 +159,47 @@ namespace SteamReleaseAnalytics.Tests.Infrastructure
 
             again.Id.Should().Be(firstId);
             (await second.Tags.CountAsync()).Should().Be(1);
+        }
+
+        [Fact]
+        public async Task GetOrCreateTag_DoesNotSaveNewTagOnItsOwn()
+        {
+            await using (var context = NewContext())
+            {
+                await new TagRepository(context).GetOrCreateTagAsync("Roguelike");
+            }
+
+            await using var check = NewContext();
+            (await check.Tags.CountAsync()).Should().Be(0);
+        }
+
+        [Fact]
+        public async Task GetOrCreateTag_SameNewNameTwiceBeforeSave_ReturnsSameTag()
+        {
+            await using var context = NewContext();
+            var repository = new TagRepository(context);
+
+            var first = await repository.GetOrCreateTagAsync("Roguelike");
+            var second = await repository.GetOrCreateTagAsync("Roguelike");
+
+            second.Should().BeSameAs(first);
+        }
+
+        [Fact]
+        public async Task AddGame_SavesNewTagsTogetherWithGame()
+        {
+            await using (var context = NewContext())
+            {
+                var tag = await new TagRepository(context).GetOrCreateTagAsync("Roguelike");
+                var game = Game(1, 10);
+                game.GameTags.Add(new Core.Models.GameTag { Game = game, Tag = tag });
+                await new GameRepository(context).AddGameAsync(game);
+            }
+
+            await using var check = NewContext();
+            var saved = await new GameRepository(check).GetGameByIdAsync(1);
+            saved!.GameTags.Select(gt => gt.Tag.Name).Should().Equal("Roguelike");
+            (await check.Tags.CountAsync()).Should().Be(1);
         }
     }
 }

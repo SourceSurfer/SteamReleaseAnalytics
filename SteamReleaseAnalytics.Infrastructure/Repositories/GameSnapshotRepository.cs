@@ -35,13 +35,13 @@ namespace SteamReleaseAnalytics.Infrastructure.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task<List<GameSnapshot>> GetLatestSnapshotsByMonthAsync(int year, int month)
+        public async Task<List<GameSnapshot>> GetSnapshotsByMonthAsync(int year, int month)
         {
             var startDate = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var endDate = startDate.AddMonths(1).AddDays(-1);
+            var nextMonth = startDate.AddMonths(1);
 
             return await _context.GameSnapshots
-                .Where(s => s.SnapshotDate >= startDate && s.SnapshotDate <= endDate)
+                .Where(s => s.SnapshotDate >= startDate && s.SnapshotDate < nextMonth)
                 .ToListAsync();
         }
     }

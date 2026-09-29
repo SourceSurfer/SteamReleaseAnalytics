@@ -1,8 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 using SteamReleaseAnalytics.Services.Security;
@@ -15,32 +15,23 @@ namespace SteamReleaseAnalytics.Tests.Services
         private const string Issuer = "SteamReleaseAnalytics";
         private const string Audience = "SteamReleaseAnalyticsUsers";
 
-        // Тот же запасной ключ, что и в Program.cs: сгенерированный токен должен проходить его проверку.
-        private const string FallbackSecret = "default-secret-key-change-this-in-production-at-least-32-characters-long!!!";
-
-        private static JwtTokenGenerator CreateGenerator(IDictionary<string, string?> jwtSettings)
+        private static JwtOptions Options(int expirationMinutes = 30) => new()
         {
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(jwtSettings.ToDictionary(kv => $"JwtSettings:{kv.Key}", kv => kv.Value))
-                .Build();
-            return new JwtTokenGenerator(configuration);
-        }
+            Secret = Secret,
+            Issuer = Issuer,
+            Audience = Audience,
+            ExpirationMinutes = expirationMinutes
+        };
 
-        private static JwtTokenGenerator CreateGenerator(string? expirationMinutes = "30") =>
-            CreateGenerator(new Dictionary<string, string?>
-            {
-                ["Secret"] = Secret,
-                ["Issuer"] = Issuer,
-                ["Audience"] = Audience,
-                ["ExpirationMinutes"] = expirationMinutes
-            });
+        private static JwtTokenGenerator CreateGenerator(int expirationMinutes = 30) =>
+            new(Microsoft.Extensions.Options.Options.Create(Options(expirationMinutes)));
 
-        // Параметры проверки повторяют настройку AddJwtBearer в Program.cs.
+        // Ключ строится тем же JwtOptions.CreateSigningKey, что и в настройке JwtBearer в Program.cs.
         private static ClaimsPrincipal Validate(string token, string secret = Secret) =>
             new JwtSecurityTokenHandler().ValidateToken(token, new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(secret)),
+                IssuerSigningKey = new JwtOptions { Secret = secret }.CreateSigningKey(),
                 ValidateIssuer = true,
                 ValidIssuer = Issuer,
                 ValidateAudience = true,
@@ -71,7 +62,7 @@ namespace SteamReleaseAnalytics.Tests.Services
         }
 
         [Fact]
-        public void GenerateToken_UsesIssuerAndAudienceFromConfiguration()
+        public void GenerateToken_UsesIssuerAndAudienceFromOptions()
         {
             var jwt = new JwtSecurityTokenHandler().ReadJwtToken(CreateGenerator().GenerateToken("alice"));
 
@@ -82,17 +73,15 @@ namespace SteamReleaseAnalytics.Tests.Services
         [Fact]
         public void GenerateToken_ExpiresAfterConfiguredMinutes()
         {
-            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(CreateGenerator("15").GenerateToken("alice"));
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(CreateGenerator(15).GenerateToken("alice"));
 
             jwt.ValidTo.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(15), TimeSpan.FromSeconds(30));
         }
 
         [Fact]
-        public void GenerateToken_WithoutExpirationSetting_ExpiresAfterSixtyMinutes()
+        public void JwtOptions_DefaultExpiration_IsSixtyMinutes()
         {
-            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(CreateGenerator(expirationMinutes: null).GenerateToken("alice"));
-
-            jwt.ValidTo.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(60), TimeSpan.FromSeconds(30));
+            new JwtOptions().ExpirationMinutes.Should().Be(60);
         }
 
         [Fact]
@@ -105,18 +94,27 @@ namespace SteamReleaseAnalytics.Tests.Services
             act.Should().Throw<SecurityTokenInvalidSignatureException>();
         }
 
-        [Fact]
-        public void GenerateToken_WithoutConfiguredSecret_IsSignedWithFallbackKeyUsedByApi()
+        [Theory]
+        [InlineData("")]
+        [InlineData("too-short-for-hmac-sha256")]
+        public void JwtOptions_WithMissingOrShortSecret_IsInvalid(string secret)
         {
-            var generator = CreateGenerator(new Dictionary<string, string?>
-            {
-                ["Issuer"] = Issuer,
-                ["Audience"] = Audience
-            });
+            var options = Options();
+            options.Secret = secret;
 
-            var principal = Validate(generator.GenerateToken("alice"), secret: FallbackSecret);
+            var results = new List<ValidationResult>();
+            Validator.TryValidateObject(options, new ValidationContext(options), results, validateAllProperties: true)
+                .Should().BeFalse();
+            results.SelectMany(r => r.MemberNames).Should().Contain(nameof(JwtOptions.Secret));
+        }
 
-            principal.FindFirst(ClaimTypes.Name)!.Value.Should().Be("alice");
+        [Fact]
+        public void JwtOptions_Complete_IsValid()
+        {
+            var options = Options();
+
+            Validator.TryValidateObject(options, new ValidationContext(options), new List<ValidationResult>(), validateAllProperties: true)
+                .Should().BeTrue();
         }
     }
 }

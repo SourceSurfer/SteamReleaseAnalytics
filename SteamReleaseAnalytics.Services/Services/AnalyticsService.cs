@@ -53,10 +53,10 @@ namespace SteamReleaseAnalytics.Services.Services
                 var games = await _gameRepository.GetGamesByMonthAsync(monthInfo.Year, monthInfo.Month);
                 var monthStr = $"{monthInfo.Year}-{monthInfo.Month:D2}";
 
+                // Все жанры месяца: топ-5 выбирается ниже по сумме за три месяца
                 var genreStats = games
                     .SelectMany(g => g.GameTags.Select(gt => new { Genre = gt.Tag.Name, Game = g }))
-                    .GroupBy(g => g.Genre)
-                    .Take(5);
+                    .GroupBy(g => g.Genre);
 
                 foreach (var group in genreStats)
                 {
