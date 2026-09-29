@@ -7,13 +7,16 @@ namespace SteamReleaseAnalytics.Services.Services
     {
         private readonly IGameRepository _gameRepository;
         private readonly IGameSnapshotRepository _snapshotRepository;
+        private readonly TimeProvider _timeProvider;
 
         public AnalyticsService(
             IGameRepository gameRepository,
-            IGameSnapshotRepository snapshotRepository)
+            IGameSnapshotRepository snapshotRepository,
+            TimeProvider timeProvider)
         {
             _gameRepository = gameRepository;
             _snapshotRepository = snapshotRepository;
+            _timeProvider = timeProvider;
         }
 
         public async Task<List<GenreStatsDto>> GetTopGenresAsync(int month, int year)
@@ -38,7 +41,7 @@ namespace SteamReleaseAnalytics.Services.Services
 
         public async Task<List<GenreDynamicsDto>> GetGenreDynamicsAsync()
         {
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var months = new[]
             {
                 new { Year = now.AddMonths(-2).Year, Month = now.AddMonths(-2).Month },

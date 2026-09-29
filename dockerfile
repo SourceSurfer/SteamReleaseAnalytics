@@ -7,6 +7,7 @@ COPY ["SteamReleaseAnalytics.Api/SteamReleaseAnalytics.Api.csproj", "SteamReleas
 COPY ["SteamReleaseAnalytics.Core/SteamReleaseAnalytics.Core.csproj", "SteamReleaseAnalytics.Core/"]
 COPY ["SteamReleaseAnalytics.Infrastructure/SteamReleaseAnalytics.Infrastructure.csproj", "SteamReleaseAnalytics.Infrastructure/"]
 COPY ["SteamReleaseAnalytics.Services/SteamReleaseAnalytics.Services.csproj", "SteamReleaseAnalytics.Services/"]
+COPY ["tests/SteamReleaseAnalytics.Tests/SteamReleaseAnalytics.Tests.csproj", "tests/SteamReleaseAnalytics.Tests/"]
 
 RUN dotnet restore "SteamReleaseAnalytics.sln"
 

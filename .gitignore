@@ -98,3 +98,6 @@ ApplicationInsights.config
 # Logs
 logs/
 *.log
+# Рабочие заметки (не публикуются)
+TASK.md
+*.zip

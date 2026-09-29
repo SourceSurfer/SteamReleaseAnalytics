@@ -1,0 +1,109 @@
+using Microsoft.EntityFrameworkCore;
+
+using SteamReleaseAnalytics.Infrastructure.Data;
+using SteamReleaseAnalytics.Infrastructure.Repositories;
+
+using static SteamReleaseAnalytics.Tests.TestData;
+
+namespace SteamReleaseAnalytics.Tests.Infrastructure
+{
+    /// <summary>
+    /// Репозитории поверх EF Core InMemory: отдельная база на каждый тест, без PostgreSQL.
+    /// Запись и чтение идут через разные экземпляры контекста, чтобы не проверять трекер вместо запроса.
+    /// </summary>
+    public class RepositoryTests
+    {
+        private readonly DbContextOptions<SteamDbContext> _options = new DbContextOptionsBuilder<SteamDbContext>()
+            .UseInMemoryDatabase($"steam-tests-{Guid.NewGuid()}")
+            .Options;
+
+        private SteamDbContext NewContext() => new(_options);
+
+        private static DateTime Utc(int year, int month, int day, int hour = 0) =>
+            new(year, month, day, hour, 0, 0, DateTimeKind.Utc);
+
+        private async Task SeedAsync(params Core.Models.Game[] games)
+        {
+            await using var context = NewContext();
+            context.Games.AddRange(games);
+            await context.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task GetGamesByMonth_ReturnsOnlyReleasesOfThatMonthOrderedByDate()
+        {
+            await SeedAsync(
+                Game(1, 10, Utc(2025, 11, 15)),
+                Game(2, 10, Utc(2025, 10, 31, 23)),
+                Game(3, 10, Utc(2025, 11, 1)),
+                Game(4, 10, Utc(2025, 12, 1)),
+                Game(5, 10, Utc(2025, 11, 30)),
+                Game(6, 10, releaseDate: null));
+
+            await using var context = NewContext();
+            var games = await new GameRepository(context).GetGamesByMonthAsync(2025, 11);
+
+            games.Select(g => g.SteamAppId).Should().Equal(3, 1, 5);
+        }
+
+        [Fact]
+        public async Task GetGamesByMonth_LoadsTagsOfReturnedGames()
+        {
+            await SeedAsync(Game(1, 10, Utc(2025, 11, 15), "Action", "RPG"));
+
+            await using var context = NewContext();
+            var games = await new GameRepository(context).GetGamesByMonthAsync(2025, 11);
+
+            games.Should().ContainSingle()
+                .Which.GameTags.Select(gt => gt.Tag.Name).Should().BeEquivalentTo("Action", "RPG");
+        }
+
+        [Fact]
+        public async Task GetGamesByTag_ReturnsOnlyGamesWithThatTag()
+        {
+            await SeedAsync(
+                Game(1, 10, "Action", "RPG"),
+                Game(2, 10, "Puzzle"),
+                Game(3, 10, "RPG"));
+
+            await using var context = NewContext();
+            var games = await new GameRepository(context).GetGamesByTagAsync("RPG");
+
+            games.Select(g => g.SteamAppId).Should().BeEquivalentTo(new[] { 1, 3 });
+        }
+
+        [Fact]
+        public async Task DeleteGame_RemovesGameAndIgnoresUnknownId()
+        {
+            await SeedAsync(Game(1, 10, "Action"), Game(2, 10));
+
+            await using (var context = NewContext())
+            {
+                var repository = new GameRepository(context);
+                await repository.DeleteGameAsync(1);
+                await repository.DeleteGameAsync(999);
+            }
+
+            await using var check = NewContext();
+            var repositoryAfter = new GameRepository(check);
+            (await repositoryAfter.GameExistsAsync(1)).Should().BeFalse();
+            (await repositoryAfter.GameExistsAsync(2)).Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task GetOrCreateTag_CreatesTagOnceAndReusesItAfterwards()
+        {
+            int firstId;
+            await using (var context = NewContext())
+            {
+                firstId = (await new TagRepository(context).GetOrCreateTagAsync("Roguelike")).Id;
+            }
+
+            await using var second = NewContext();
+            var again = await new TagRepository(second).GetOrCreateTagAsync("Roguelike");
+
+            again.Id.Should().Be(firstId);
+            (await second.Tags.CountAsync()).Should().Be(1);
+        }
+    }
+}

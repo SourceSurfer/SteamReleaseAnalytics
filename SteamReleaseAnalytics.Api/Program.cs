@@ -31,6 +31,7 @@ builder.Services.AddScoped<ITagRepository, TagRepository>();
 builder.Services.AddScoped<IGameSnapshotRepository, GameSnapshotRepository>();
 
 // Register Services
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
