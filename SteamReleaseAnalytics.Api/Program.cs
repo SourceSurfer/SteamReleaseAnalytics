@@ -72,6 +72,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Apply pending migrations on startup (enabled in launchSettings.json and docker-compose.yml)
+if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
+{
+    using var scope = app.Services.CreateScope();
+    scope.ServiceProvider.GetRequiredService<SteamDbContext>().Database.Migrate();
+}
+
 // Enable Swagger for both Development and Production
 app.UseSwagger();
 app.UseSwaggerUI(c =>

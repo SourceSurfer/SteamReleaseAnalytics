@@ -32,7 +32,6 @@ nuget.config
 # Entity Framework
 *.edmx.diagram
 *.edmx
-Migrations/
 
 # Test Results
 [Tt]est[Rr]esult*/

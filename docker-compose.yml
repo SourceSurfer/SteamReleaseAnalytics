@@ -38,10 +38,10 @@ services:
     container_name: steam_releases_api
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - Database__ApplyMigrationsOnStartup=true
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=steam_releases;Username=postgres;Password=postgres;
     ports:
       - "8080:8080"
-      - "8443:8443"
     depends_on:
       postgres:
         condition: service_healthy
